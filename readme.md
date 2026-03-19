@@ -1,60 +1,78 @@
+Here’s a stronger `README.md` focused on **user analysis and segmentation** for that repo.
+
 ```markdown
-# Polymarket Stats
+# Polymarket User Segments
 
-Track Polymarket trading activity, store it in PostgreSQL, compute per-wallet features, tag wallets into useful segments, and explore the results in a Flask dashboard.
+Analyze Polymarket wallets, classify user behavior, and explore segmented traders through a PostgreSQL-backed pipeline and Flask dashboard.
 
-## What this project does
+Repository: `https://github.com/luisriverag/polymarket-user_segments`
 
-This project has three main parts:
+## Overview
 
-- `init_db.py` initializes the PostgreSQL schema
-- `ingest.py` continuously ingests Polymarket trades and refreshes wallet features/tags
-- `app.py` serves a Flask dashboard to inspect wallets, tags, and recent trades
+This project is built for **user-level analysis** of Polymarket activity.
 
-The pipeline is built around:
+Instead of focusing only on raw trade ingestion, the core goal is to answer questions like:
 
-- raw trade storage
-- derived wallet features
-- rule-based tagging
-- a simple web UI for exploration
+- Which wallets are consistently active?
+- Which traders concentrate on a small number of markets?
+- Which wallets show unusually high win rates?
+- Which users place larger bets than average?
+- Which traders look worth monitoring over time?
 
-## Current feature set
+The system continuously ingests recent Polymarket trades, aggregates them by wallet, computes behavioral features, and assigns rule-based tags that make exploration easier.
 
-### Raw ingestion
+## Main use cases
 
-The ingestion process stores:
+This project is useful for:
 
-- wallet address
-- market ID
-- title / slug
-- outcome
-- side
-- price
-- size
-- timestamp
-- raw JSON payload
+- building trader watchlists
+- identifying high-conviction or concentrated bettors
+- finding wallets with strong recent performance
+- exploring behavioral patterns across users
+- segmenting wallets for dashboards, research, or alerting
+- studying wallet specialization and trading consistency
 
-Trades are stored idempotently using a generated stable trade hash.
+## What the project does
 
-### Wallet features
+The pipeline has four layers:
 
-For each wallet, the app computes metrics like:
+1. **Raw trade collection**
+   - stores recent Polymarket trades in PostgreSQL
+
+2. **Wallet feature generation**
+   - computes wallet-level behavioral metrics from raw trades
+
+3. **User segmentation**
+   - assigns tags based on rules and thresholds
+
+4. **Exploration UI**
+   - provides a Flask dashboard for filtering, browsing, and inspecting wallets
+
+## User analysis model
+
+The project treats each wallet as a user profile with measurable traits.
+
+### Examples of user-level features
+
+Each wallet can be described with metrics such as:
 
 - total trades
 - total volume
 - active weeks
-- distinct markets
-- top market concentration
-- top 3 market concentration
+- distinct markets traded
+- concentration in top market
+- concentration in top 3 markets
 - average bet size
 - median bet size
 - realized PnL
 - win rate
-- biggest single win
+- biggest single realized win
 
-### Tags
+These features are stored in `user_features`.
 
-Example wallet tags:
+### Examples of tags
+
+Wallets are segmented with heuristic tags such as:
 
 - `big_single_win`
 - `high_win_rate`
@@ -64,12 +82,14 @@ Example wallet tags:
 - `large_size_trader`
 - `possible_informed`
 
-These are heuristic labels, not proof of anything illicit.
+These tags are stored in `user_tags`.
+
+They are intended as **analytical labels**, not factual judgments or proof of misconduct.
 
 ## Project structure
 
 ```text
-polymarket-stats/
+polymarket-user_segments/
 ├── app.py
 ├── init_db.py
 ├── ingest.py
@@ -82,96 +102,256 @@ polymarket-stats/
     └── tags.html
 ```
 
-## Requirements
+## Data model
+
+### `polymarket_trades`
+
+Stores raw trade-level events.
+
+Fields include:
+
+- `trade_id`
+    
+- `proxy_wallet`
+    
+- `market_id`
+    
+- `title`
+    
+- `slug`
+    
+- `outcome`
+    
+- `side`
+    
+- `price`
+    
+- `size`
+    
+- `ts`
+    
+- `raw`
+    
+
+### `user_features`
+
+Stores wallet-level aggregate metrics.
+
+### `user_tags`
+
+Stores segmentation labels and scores for each wallet.
+
+### `ingestion_state`
+
+Stores pipeline cursor state for incremental ingestion.
+
+### `closed_positions_cache`
+
+Caches closed-position responses to reduce rate-limit pressure and avoid repeatedly querying the same wallet.
+
+## Current segmentation philosophy
+
+This repo is focused on **behavioral segmentation**, not prediction or accusation.
+
+The emphasis is on questions like:
+
+- Is this user highly active?
+    
+- Is this user concentrated in one market?
+    
+- Is this user a large-size trader?
+    
+- Does this wallet have strong realized outcomes?
+    
+- Does this trader appear consistently profitable over the available data?
+    
+
+The tags are meant to support:
+
+- research
+    
+- ranking
+    
+- filtering
+    
+- watchlist creation
+    
+- dashboard exploration
+    
+
+## Tag definitions
+
+### `big_single_win`
+
+Assigned when a wallet has at least one large realized win.
+
+This helps identify users who landed an outsized payout, even if they are not consistently profitable.
+
+### `high_win_rate`
+
+Assigned when a wallet has a high fraction of winning closed positions over a minimum sample size.
+
+Useful for spotting potentially skilled or selective users.
+
+### `weekly_active`
+
+Assigned when a wallet is active across multiple recent weeks.
+
+Useful for separating casual bettors from recurring traders.
+
+### `single_market_specialist`
+
+Assigned when one market dominates a wallet’s volume.
+
+Useful for identifying users with narrow thematic focus or conviction.
+
+### `concentrated_bettor`
+
+Assigned when most volume sits in a very small number of markets.
+
+Useful for identifying concentrated strategies.
+
+### `large_size_trader`
+
+Assigned when the wallet’s typical bet sizing is relatively large.
+
+Useful for spotting higher-conviction or higher-capital participants.
+
+### `possible_informed`
+
+Assigned when a wallet combines positive realized PnL, decent win rate, and repeat activity.
+
+This is only a heuristic research label and should be interpreted carefully.
+
+## Dashboard focus
+
+The dashboard is designed around **user exploration**, not just raw data inspection.
+
+### Main dashboard
+
+The main page helps answer:
+
+- which users match certain tags
+    
+- which users meet minimum PnL / win-rate / activity thresholds
+    
+- which wallets are worth drilling into next
+    
+
+### User detail page
+
+Each wallet page helps answer:
+
+- what tags does this user have
+    
+- what are this trader’s key metrics
+    
+- which markets dominate their behavior
+    
+- what does their recent trading activity look like
+    
+
+### Tag exploration
+
+The tag views help answer:
+
+- how many users fall into each segment
+    
+- which tags are rare or common
+    
+- which wallets overlap across multiple tag groups
+    
+
+## Filtering capabilities
+
+The Flask UI supports user-focused analysis through filters like:
+
+- wallet search
+    
+- multiple included tags
+    
+- multiple excluded tags
+    
+- include mode:
+    
+    - `any`
+        
+    - `all`
+        
+    - `exact`
+        
+- minimum tag score
+    
+- minimum realized PnL
+    
+- minimum win rate
+    
+- minimum trade count
+    
+- sorting by key behavioral metrics
+    
+
+This makes the dashboard useful for workflows such as:
+
+- "show me users who are both `high_win_rate` and `weekly_active`"
+    
+- "show concentrated bettors, but exclude large-size traders"
+    
+- "show users with `possible_informed` score above 0.7"
+    
+- "show wallets with high PnL and at least 20 trades"
+    
+
+## Installation
+
+### Requirements
 
 - Python 3.11+
     
 - PostgreSQL
     
-- virtualenv or venv recommended
+- `venv` or another virtual environment tool
     
 
-## Python dependencies
-
-Install dependencies with:
+### Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Example `requirements.txt`:
-
-```txt
-Flask>=3.1
-psycopg2-binary>=2.9
-requests>=2.32
-```
-
 ## PostgreSQL setup
 
-Make sure PostgreSQL is running and reachable.
-
-Example local DSN:
+Set your PostgreSQL DSN:
 
 ```bash
 export PG_DSN=postgresql://postgres:postgres@localhost:5432/postgres
 ```
 
-To verify Postgres is listening:
+Check that PostgreSQL is reachable:
 
 ```bash
 pg_isready -h localhost -p 5432
 ```
 
-If needed, start PostgreSQL.
-
-On Ubuntu/Debian:
-
-```bash
-sudo systemctl start postgresql
-sudo systemctl status postgresql
-```
-
-On macOS with Homebrew:
-
-```bash
-brew services start postgresql
-```
-
 ## Initialize the database
-
-Run:
 
 ```bash
 python init_db.py
 ```
 
-This creates:
+This creates the schema and supporting cache tables.
 
-- `polymarket_trades`
-    
-- `user_features`
-    
-- `user_tags`
-    
-- `ingestion_state`
-    
-- `v_user_summary`
-    
+## Running the pipeline
 
-## Run the ingestor
-
-### Normal run
+### Start ingestion
 
 ```bash
 python ingest.py
 ```
 
-### Run with a reset cursor
+### Optional backfill reset
 
-To backfill from a point in the past, set `RESET_CURSOR_MINUTES`.
-
-Example: 7 days
+Example: start 7 days back
 
 ```bash
 export RESET_CURSOR_MINUTES=10080
@@ -185,7 +365,7 @@ unset RESET_CURSOR_MINUTES
 python ingest.py
 ```
 
-### Helpful environment variables
+### Recommended environment variables
 
 ```bash
 export PG_DSN=postgresql://postgres:postgres@localhost:5432/postgres
@@ -193,270 +373,196 @@ export POLL_SECONDS=30
 export BACKFILL_MINUTES=10
 export FEATURE_LOOKBACK_DAYS=90
 export TRADE_PAGE_LIMIT=500
+export CLOSED_POSITIONS_REFRESH_HOURS=24
+export MAX_CLOSED_POSITIONS_REFRESH_PER_LOOP=5
 export DEBUG_DB_COUNTS=1
 ```
 
-### Notes about ingestion depth
-
-The current Polymarket public `/trades` ingestion logic is best for:
-
-- continuous collection
-    
-- shallow recent backfills
-    
-
-It is not ideal for deep historical reconstruction using the public trades feed alone, because pagination is limited.
-
-## Run the Flask dashboard
+## Running the dashboard
 
 ```bash
 flask --app app run --debug
 ```
 
-Then open:
+Open:
 
 ```text
 http://127.0.0.1:5000
 ```
 
-## Dashboard pages
+## Example user analysis workflows
 
-### `/`
+### Find high-quality recurring traders
 
-Main dashboard with:
+Use filters such as:
 
-- tracked user stats
+- include tags: `high_win_rate`, `weekly_active`
     
-- wallet search
+- tag mode: `all`
     
-- tag filter
-    
-- sortable user table
-    
-- tag leaderboard
+- min trades: `10`
     
 
-### `/user/<wallet>`
+### Find concentrated specialists
 
-Wallet detail page with:
+Use filters such as:
 
-- feature summary
+- include tags: `single_market_specialist`, `concentrated_bettor`
     
-- tags and reasons
-    
-- top markets
-    
-- recent trades
+- tag mode: `all`
     
 
-### `/tags`
+### Find large, profitable traders
 
-Tag leaderboard page showing:
+Use filters such as:
 
-- tag name
+- include tags: `large_size_trader`
     
-- user count
+- min realized PnL: `1000`
     
-- average score
-    
-- max score
+- min win rate: `0.60`
     
 
-## Common workflow
+### Find candidate watchlist wallets
 
-Start with:
+Use filters such as:
 
-```bash
-export PG_DSN=postgresql://postgres:postgres@localhost:5432/postgres
-python init_db.py
-python ingest.py
-```
+- include tags: `possible_informed`
+    
+- min tag score: `0.70`
+    
 
-In another terminal:
+## Useful SQL for analysis
 
-```bash
-export PG_DSN=postgresql://postgres:postgres@localhost:5432/postgres
-flask --app app run --debug
-```
-
-## Useful SQL checks
-
-See how much data you actually have:
+### How many wallets have been ingested
 
 ```sql
-select count(*) from polymarket_trades;
 select count(distinct proxy_wallet) from polymarket_trades;
-select count(*) from user_features;
-select min(ts), max(ts) from polymarket_trades;
 ```
 
-See top wallets:
+### Total wallets with computed features
+
+```sql
+select count(*) from user_features;
+```
+
+### Most profitable wallets
+
+```sql
+select wallet, realized_pnl, win_rate, total_trades
+from user_features
+order by realized_pnl desc nulls last
+limit 100;
+```
+
+### Wallets by tag
+
+```sql
+select tag, count(*) as wallets
+from user_tags
+group by tag
+order by wallets desc, tag asc;
+```
+
+### Top tagged wallets with full context
 
 ```sql
 select
   f.wallet,
-  f.win_rate,
   f.realized_pnl,
+  f.win_rate,
+  f.total_trades,
   f.active_weeks,
-  f.top_market_volume_share,
   array_agg(t.tag order by t.tag) as tags
 from user_features f
 left join user_tags t on t.wallet = f.wallet
-group by 1,2,3,4,5
+group by f.wallet, f.realized_pnl, f.win_rate, f.total_trades, f.active_weeks
 order by f.realized_pnl desc nulls last
 limit 100;
 ```
 
-## Why the dashboard may show fewer users than expected
+## Rate limits and caching
 
-A few common reasons:
+The project uses the public Polymarket data endpoints, which can rate-limit aggressively when profile-like endpoints are queried too often.
 
-- ingestion only started from a recent cursor
+To reduce rate-limit issues:
+
+- closed positions are cached in `closed_positions_cache`
     
-- the public trades endpoint only covers a limited recent pagination window
+- cached wallet data is refreshed on a slower schedule
     
-- the Flask table itself may have a `LIMIT` in SQL
+- only a limited number of wallets are refreshed per loop
     
-- features are only refreshed for wallets touched by recent inserts
-    
-
-Check the database counts directly before assuming the UI is the source of truth.
-
-## Tag definitions
-
-Current tags are rule-based.
-
-### `big_single_win`
-
-Assigned when a wallet has at least one large realized win.
-
-### `high_win_rate`
-
-Assigned when a wallet has a high win rate over enough samples.
-
-### `weekly_active`
-
-Assigned when a wallet appears consistently active across multiple weeks.
-
-### `single_market_specialist`
-
-Assigned when one market dominates the wallet’s volume.
-
-### `concentrated_bettor`
-
-Assigned when the top three markets dominate the wallet’s volume.
-
-### `large_size_trader`
-
-Assigned when the wallet’s median bet size is high.
-
-### `possible_informed`
-
-Assigned when a wallet combines positive realized PnL, decent win rate, and sustained activity.
-
-## Limitations
-
-Current limitations include:
-
-- public trades pagination is shallow
-    
-- realized PnL depends on closed-positions endpoint coverage
-    
-- no deep historical market outcome warehouse yet
-    
-- tags are heuristics, not ground truth
-    
-- no async job queue yet
-    
-- no authentication on the Flask dashboard
+- retry/backoff logic is used for throttled requests
     
 
-## Recommended next upgrades
+This keeps the pipeline focused on user analysis without overwhelming the API.
 
-Good next improvements:
+## Known limitations
 
-- add pagination to the Flask UI
+### Historical depth
+
+The public `/trades` endpoint is best for:
+
+- continuous collection
     
-- add charts for wallet activity and PnL
+- recent data windows
     
-- add a `resolved_markets` table
-    
-- compute per-market and per-category accuracy
-    
-- build a leaderboard discovery strategy for better wallet coverage
-    
-- add Docker Compose
-    
-- add Alembic migrations
-    
-- add caching for closed-position fetches
-    
-- add background workers
+- shallow backfills
     
 
-## Troubleshooting
+It is not ideal for reconstructing deep full-history trade archives from scratch.
 
-### PostgreSQL connection refused
+### Tag quality depends on available data
 
-Example error:
+User tags are only as good as the observed trade window and available closed-position coverage.
 
-```text
-connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
-```
+### Tags are heuristics
 
-This means Postgres is not reachable. Check:
+Labels such as `possible_informed` are best treated as screening tools, not hard conclusions.
 
-```bash
-pg_isready -h localhost -p 5432
-ss -ltnp | grep 5432
-```
+## Roadmap
 
-### Flask starts but the table looks too small
+Planned or useful next steps:
 
-Possible causes:
-
-- SQL `LIMIT` in `app.py`
+- add user cohorts and segment groups
     
-- not enough ingested trades
+- add user ranking pages
     
-- cursor started too recently
+- add per-market performance pages
     
-
-Check database counts directly.
-
-### Ingestor keeps fetching but not growing
-
-Possible causes:
-
-- cursor is too close to now
+- add freshness indicators for cached PnL data
     
-- repeated overlap with already ingested trades
+- add saved dashboard presets
     
-- public trades pagination depth reached
+- add charts for user behavior over time
+    
+- add exportable watchlists
+    
+- add deep historical enrichment if a better source is added
     
 
-Try a one-time cursor reset:
+## Intended audience
 
-```bash
-export RESET_CURSOR_MINUTES=10080
-python ingest.py
-```
+This repo is for people who want to analyze Polymarket users, including:
 
-### Network 400 on `/trades`
+- researchers
+    
+- traders
+    
+- data analysts
+    
+- market observers
+    
+- anyone building watchlists or behavioral dashboards
+    
 
-Make sure `TRADE_PAGE_LIMIT` is not above 500.
+## Disclaimer
 
-Use:
-
-```bash
-export TRADE_PAGE_LIMIT=500
-```
-
-## Security note
-
-This project is intended for analytics and watchlist-style segmentation. Labels such as `possible_informed` are heuristic and should not be treated as proof of insider trading or misconduct.
+This repository is for analytics and research.  
+Tags and scores are heuristic outputs based on observable public activity and cached derived features. They should not be interpreted as definitive proof of intent, identity, or misconduct.
 
 ## License
 
-Add your preferred license here.
+TBD
 

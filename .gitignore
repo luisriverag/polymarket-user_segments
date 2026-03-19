@@ -1,0 +1,50 @@
+#passwords
+*.env
+
+#virtual environment
+venv
+
+#wip directories
+wip
+poc
+purgatory
+
+#logs
+*.log
+
+#temp files
+*.tmp
+
+#cache
+*.cache
+
+# IDE-specific files
+.vscode/
+.idea/
+
+# Compiled Python files
+*.pyc
+__pycache__/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Dependency directories
+node_modules/
+bower_components/
+
+# Build output
+dist/
+build/
+
+# Backup files
+*.bak
+*.swp
+
+# Coverage reports
+coverage/
+
+# Database files
+*.sqlite3
+*.db
