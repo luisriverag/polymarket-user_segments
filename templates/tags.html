@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1>Tag Leaderboard</h1>
+
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Tag</th>
+        <th>User count</th>
+        <th>Avg score</th>
+        <th>Max score</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td><a href="/?tag={{ r.tag }}">{{ r.tag }}</a></td>
+        <td>{{ r.user_count }}</td>
+        <td>{{ r.avg_score|num }}</td>
+        <td>{{ r.max_score|num }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

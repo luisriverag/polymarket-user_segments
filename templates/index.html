@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1>Polymarket User Tracker</h1>
+
+<div class="grid">
+  <div class="card">
+    <div class="muted">All tracked users</div>
+    <div class="stat">{{ global_stats.total_users|intcomma }}</div>
+  </div>
+  <div class="card">
+    <div class="muted">Filtered users</div>
+    <div class="stat">{{ filtered_stats.total_users|intcomma }}</div>
+  </div>
+  <div class="card">
+    <div class="muted">Filtered realized PnL</div>
+    <div class="stat">{{ filtered_stats.total_realized_pnl|num }}</div>
+  </div>
+  <div class="card">
+    <div class="muted">Filtered volume</div>
+    <div class="stat">{{ filtered_stats.total_volume|num }}</div>
+  </div>
+</div>
+
+<div class="card">
+  <form method="get">
+    <div class="filter-grid">
+      <div>
+        <label>Wallet search</label><br>
+        <input type="text" name="q" value="{{ q or '' }}" placeholder="0x..." style="width:100%;">
+      </div>
+
+      <div>
+        <label>Min realized PnL</label><br>
+        <input type="text" name="min_pnl" value="{{ min_pnl or '' }}" placeholder="1000" style="width:100%;">
+      </div>
+
+      <div>
+        <label>Min win rate</label><br>
+        <input type="text" name="min_win_rate" value="{{ min_win_rate or '' }}" placeholder="0.75 or 75" style="width:100%;">
+      </div>
+
+      <div>
+        <label>Min trades</label><br>
+        <input type="text" name="min_trades" value="{{ min_trades or '' }}" placeholder="10" style="width:100%;">
+      </div>
+
+      <div>
+        <label>Min tag score</label><br>
+        <input type="text" name="min_tag_score" value="{{ min_tag_score or '' }}" placeholder="0.50" style="width:100%;">
+      </div>
+
+      <div>
+        <label>Tag search</label><br>
+        <input type="text" name="tag_search" value="{{ tag_search or '' }}" placeholder="type tag name..." style="width:100%;">
+      </div>
+
+      <div>
+        <label>Sort</label><br>
+        <select name="sort" style="width:100%;">
+          <option value="realized_pnl" {% if current_sort == 'realized_pnl' %}selected{% endif %}>realized_pnl</option>
+          <option value="win_rate" {% if current_sort == 'win_rate' %}selected{% endif %}>win_rate</option>
+          <option value="total_volume" {% if current_sort == 'total_volume' %}selected{% endif %}>total_volume</option>
+          <option value="total_trades" {% if current_sort == 'total_trades' %}selected{% endif %}>total_trades</option>
+          <option value="active_weeks" {% if current_sort == 'active_weeks' %}selected{% endif %}>active_weeks</option>
+          <option value="biggest_single_win" {% if current_sort == 'biggest_single_win' %}selected{% endif %}>biggest_single_win</option>
+          <option value="distinct_markets" {% if current_sort == 'distinct_markets' %}selected{% endif %}>distinct_markets</option>
+          <option value="top_market_volume_share" {% if current_sort == 'top_market_volume_share' %}selected{% endif %}>top_market_volume_share</option>
+          <option value="top3_market_volume_share" {% if current_sort == 'top3_market_volume_share' %}selected{% endif %}>top3_market_volume_share</option>
+          <option value="avg_bet_size" {% if current_sort == 'avg_bet_size' %}selected{% endif %}>avg_bet_size</option>
+          <option value="median_bet_size" {% if current_sort == 'median_bet_size' %}selected{% endif %}>median_bet_size</option>
+          <option value="wallet" {% if current_sort == 'wallet' %}selected{% endif %}>wallet</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Direction</label><br>
+        <select name="dir" style="width:100%;">
+          <option value="desc" {% if current_dir == 'desc' %}selected{% endif %}>desc</option>
+          <option value="asc" {% if current_dir == 'asc' %}selected{% endif %}>asc</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Per page</label><br>
+        <select name="per_page" style="width:100%;">
+          <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
+          <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+          <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+          <option value="200" {% if per_page == 200 %}selected{% endif %}>200</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="tag-mode-row">
+      <strong>Include mode:</strong>
+      <label><input type="radio" name="tag_mode" value="any" {% if tag_mode == 'any' %}checked{% endif %}> Any</label>
+      <label><input type="radio" name="tag_mode" value="all" {% if tag_mode == 'all' %}checked{% endif %}> All</label>
+      <label><input type="radio" name="tag_mode" value="exact" {% if tag_mode == 'exact' %}checked{% endif %}> Exact tag set</label>
+    </div>
+
+    <div class="tag-panels">
+      <div class="tag-panel">
+        <div class="tag-panel-title">Include tags</div>
+        <div class="tag-chip-wrap">
+          {% for t in available_tags %}
+            <label class="tag choice-tag include-tag {% if t.tag in include_tags %}selected{% endif %}">
+              <input
+                type="checkbox"
+                name="tag"
+                value="{{ t.tag }}"
+                {% if t.tag in include_tags %}checked{% endif %}
+              >
+              <span>{{ t.tag }}</span>
+              <span class="tag-meta">{{ t.cnt }}</span>
+            </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="tag-panel">
+        <div class="tag-panel-title">Exclude tags</div>
+        <div class="tag-chip-wrap">
+          {% for t in available_tags %}
+            <label class="tag choice-tag exclude-tag {% if t.tag in exclude_tags %}selected{% endif %}">
+              <input
+                type="checkbox"
+                name="exclude_tag"
+                value="{{ t.tag }}"
+                {% if t.tag in exclude_tags %}checked{% endif %}
+              >
+              <span>{{ t.tag }}</span>
+              <span class="tag-meta">{{ t.cnt }}</span>
+            </label>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="button-row">
+      <button type="submit">Apply filters</button>
+      <a href="/">Reset all</a>
+    </div>
+  </form>
+</div>
+
+{% if include_tags or exclude_tags %}
+<div class="card">
+  <div class="muted">Active tag filters</div>
+
+  {% if include_tags %}
+  <div style="margin-top:10px;">
+    <strong>Include</strong>
+    <span class="muted">({{ tag_mode }})</span>
+    <div class="tag-chip-wrap" style="margin-top:8px;">
+      {% for t in include_tags %}
+        <span class="tag">{{ t }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if exclude_tags %}
+  <div style="margin-top:14px;">
+    <strong>Exclude</strong>
+    <div class="tag-chip-wrap" style="margin-top:8px;">
+      {% for t in exclude_tags %}
+        <span class="tag tag-danger">{{ t }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if min_tag_score %}
+  <div class="muted" style="margin-top:12px;">
+    Minimum included tag score: {{ min_tag_score }}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="toolbar">
+    <h2 style="margin:0;">Users</h2>
+    <div class="muted">
+      Showing page {{ page }} of {{ total_pages }} · {{ total_rows|intcomma }} matching wallets
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Wallet</th>
+        <th>Tags</th>
+        <th>Win rate</th>
+        <th>Realized PnL</th>
+        <th>Volume</th>
+        <th>Trades</th>
+        <th>Weeks</th>
+        <th>Top market share</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr>
+        <td><a href="/user/{{ u.wallet }}">{{ u.wallet }}</a></td>
+        <td>
+          <div class="tag-chip-wrap">
+            {% for t in u.tags %}
+              <span class="tag {% if t.tag in exclude_tags %}tag-danger{% elif t.tag in include_tags %}tag-good{% endif %}">
+                {{ t.tag }}
+                {% if t.score is not none %}
+                  <span class="tag-score">{{ "%.2f"|format(t.score) }}</span>
+                {% endif %}
+              </span>
+            {% endfor %}
+          </div>
+        </td>
+        <td>{{ u.win_rate|pct }}</td>
+        <td>{{ u.realized_pnl|num }}</td>
+        <td>{{ u.total_volume|num }}</td>
+        <td>{{ u.total_trades|intcomma }}</td>
+        <td>{{ u.active_weeks|intcomma }}</td>
+        <td>{{ u.top_market_volume_share|pct }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="pagination-row">
+    <div class="muted">Page {{ page }} / {{ total_pages }}</div>
+    <div>
+      {% if has_prev %}
+        <a href="/?{{ build_query_params(page=page-1) }}">← Previous</a>
+      {% endif %}
+      {% if has_prev and has_next %}
+        <span class="muted" style="margin: 0 10px;">|</span>
+      {% endif %}
+      {% if has_next %}
+        <a href="/?{{ build_query_params(page=page+1) }}">Next →</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Tag leaderboard</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Tag</th>
+        <th>User count</th>
+        <th>Avg score</th>
+        <th>Max score</th>
+        <th>Quick actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in available_tags %}
+      <tr>
+        <td>{{ t.tag }}</td>
+        <td>{{ t.cnt|intcomma }}</td>
+        <td>{{ t.avg_score|num }}</td>
+        <td>{{ t.max_score|num }}</td>
+        <td>
+          <a href="/?{{ build_query_params(tag=[t.tag], exclude_tag=[], page=1) }}">Include only</a>
+          <span class="muted"> · </span>
+          <a href="/?{{ build_query_params(exclude_tag=[t.tag], tag=[], page=1) }}">Exclude only</a>
+          <span class="muted"> · </span>
+          <a href="/?{{ build_query_params(tag=include_tags + [t.tag], page=1) }}">Add include</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

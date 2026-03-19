@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1>User: {{ user.wallet }}</h1>
+
+<div class="grid">
+  <div class="card">
+    <div class="muted">Win rate</div>
+    <div class="stat">{{ user.win_rate|pct }}</div>
+  </div>
+  <div class="card">
+    <div class="muted">Realized PnL</div>
+    <div class="stat">{{ user.realized_pnl|num }}</div>
+  </div>
+  <div class="card">
+    <div class="muted">Total volume</div>
+    <div class="stat">{{ user.total_volume|num }}</div>
+  </div>
+  <div class="card">
+    <div class="muted">Total trades</div>
+    <div class="stat">{{ user.total_trades }}</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Feature summary</h2>
+  <table>
+    <tbody>
+      <tr><th>active_weeks</th><td>{{ user.active_weeks }}</td></tr>
+      <tr><th>distinct_markets</th><td>{{ user.distinct_markets }}</td></tr>
+      <tr><th>top_market_volume_share</th><td>{{ user.top_market_volume_share|pct }}</td></tr>
+      <tr><th>top3_market_volume_share</th><td>{{ user.top3_market_volume_share|pct }}</td></tr>
+      <tr><th>avg_bet_size</th><td>{{ user.avg_bet_size|num }}</td></tr>
+      <tr><th>median_bet_size</th><td>{{ user.median_bet_size|num }}</td></tr>
+      <tr><th>biggest_single_win</th><td>{{ user.biggest_single_win|num }}</td></tr>
+      <tr><th>updated_at</th><td>{{ user.updated_at }}</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>Tags</h2>
+  {% if tags %}
+    {% for t in tags %}
+      <div style="margin-bottom: 14px;">
+        <span class="tag">{{ t.tag }}</span>
+        score: {{ t.score|num }}
+        <pre>{{ t.reason }}</pre>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p>No tags yet.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Top markets</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Market</th>
+        <th>Volume</th>
+        <th>Trades</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in top_markets %}
+      <tr>
+        <td>{{ m.title or m.market_id }}</td>
+        <td>{{ m.volume|num }}</td>
+        <td>{{ m.trades }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>Recent trades</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Market</th>
+        <th>Outcome</th>
+        <th>Side</th>
+        <th>Price</th>
+        <th>Size</th>
+        <th>Notional</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in trades %}
+      <tr>
+        <td>{{ t.ts }}</td>
+        <td>{{ t.title or t.slug or t.market_id }}</td>
+        <td>{{ t.outcome }}</td>
+        <td>{{ t.side }}</td>
+        <td>{{ t.price|num }}</td>
+        <td>{{ t.size|num }}</td>
+        <td>{{ t.notional|num }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}
