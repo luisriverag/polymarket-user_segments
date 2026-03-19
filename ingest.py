@@ -2,13 +2,12 @@ import os
 import sys
 import time
 import json
-import math
 import random
 import hashlib
 import statistics
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
-from typing import Iterable, List, Tuple, Optional, Set, Dict, Any
+from typing import Iterable, List, Tuple, Optional, Set, Dict
 
 import requests
 import psycopg2
@@ -21,28 +20,27 @@ POLL_SECONDS = int(os.getenv("POLL_SECONDS", "30"))
 BACKFILL_MINUTES = int(os.getenv("BACKFILL_MINUTES", "10"))
 FEATURE_LOOKBACK_DAYS = int(os.getenv("FEATURE_LOOKBACK_DAYS", "90"))
 
-# /trades practical limits from current docs/changelog handling
 TRADE_PAGE_LIMIT = min(int(os.getenv("TRADE_PAGE_LIMIT", "500")), 500)
 TRADE_OFFSETS = (0, 500, 1000)
 
-# closed-positions docs: limit <= 50
 CLOSED_POSITIONS_LIMIT = min(int(os.getenv("CLOSED_POSITIONS_LIMIT", "50")), 50)
 CLOSED_POSITIONS_MAX_OFFSET = int(os.getenv("CLOSED_POSITIONS_MAX_OFFSET", "500"))
 
-# cache/refresh controls
 CLOSED_POSITIONS_REFRESH_HOURS = int(os.getenv("CLOSED_POSITIONS_REFRESH_HOURS", "12"))
 MAX_CLOSED_POSITIONS_REFRESH_PER_LOOP = int(os.getenv("MAX_CLOSED_POSITIONS_REFRESH_PER_LOOP", "10"))
 
-# retry/backoff controls
 HTTP_MAX_RETRIES = int(os.getenv("HTTP_MAX_RETRIES", "5"))
 HTTP_BACKOFF_BASE_SECONDS = float(os.getenv("HTTP_BACKOFF_BASE_SECONDS", "1.0"))
 HTTP_BACKOFF_MAX_SECONDS = float(os.getenv("HTTP_BACKOFF_MAX_SECONDS", "30.0"))
+
+MULTI_TIME_MIN_SPREAD_SECONDS = int(os.getenv("MULTI_TIME_MIN_SPREAD_SECONDS", "1800"))  # 30 min
+SINGLE_TIME_MAX_SPREAD_SECONDS = int(os.getenv("SINGLE_TIME_MAX_SPREAD_SECONDS", "300"))  # 5 min
 
 DEBUG_DB_COUNTS = os.getenv("DEBUG_DB_COUNTS", "0") == "1"
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
 session = requests.Session()
-session.headers.update({"User-Agent": "polymarket-stats/4.0"})
+session.headers.update({"User-Agent": "polymarket-user-segments/5.0"})
 
 
 def utc_now() -> datetime:
@@ -64,7 +62,6 @@ def get_db():
 def init_db(conn):
     with conn.cursor() as cur:
         cur.execute(SCHEMA_PATH.read_text(encoding="utf-8"))
-
         cur.execute(
             """
             create table if not exists closed_positions_cache (
@@ -74,7 +71,6 @@ def init_db(conn):
             )
             """
         )
-
         cur.execute(
             """
             create index if not exists idx_closed_positions_cache_fetched_at
@@ -364,8 +360,7 @@ def set_cached_closed_positions(conn, wallet: str, positions: List[dict]):
 def should_refresh_closed_positions(fetched_at: Optional[datetime]) -> bool:
     if fetched_at is None:
         return True
-    age = utc_now() - fetched_at
-    return age >= timedelta(hours=CLOSED_POSITIONS_REFRESH_HOURS)
+    return (utc_now() - fetched_at) >= timedelta(hours=CLOSED_POSITIONS_REFRESH_HOURS)
 
 
 def get_closed_positions_cached(conn, wallet: str, allow_refresh: bool) -> Tuple[List[dict], bool]:
@@ -385,6 +380,41 @@ def get_closed_positions_cached(conn, wallet: str, allow_refresh: bool) -> Tuple
         if cached_positions is not None:
             return cached_positions, False
         raise
+
+
+def build_market_timing_features(trades: List[dict]) -> Dict[str, float]:
+    by_market: Dict[str, List[datetime]] = {}
+    for t in trades:
+        by_market.setdefault(t["market_id"], []).append(t["ts"])
+
+    repeated_entry_markets = 0
+    single_time_markets = 0
+    total_markets = len(by_market)
+
+    for timestamps in by_market.values():
+        timestamps = sorted(timestamps)
+        count = len(timestamps)
+        spread_seconds = (timestamps[-1] - timestamps[0]).total_seconds() if count > 1 else 0
+
+        if count >= 2 and spread_seconds >= MULTI_TIME_MIN_SPREAD_SECONDS:
+            repeated_entry_markets += 1
+
+        if count == 1 or spread_seconds <= SINGLE_TIME_MAX_SPREAD_SECONDS:
+            single_time_markets += 1
+
+    repeated_entry_market_ratio = (
+        repeated_entry_markets / total_markets if total_markets > 0 else 0.0
+    )
+    single_time_market_ratio = (
+        single_time_markets / total_markets if total_markets > 0 else 0.0
+    )
+
+    return {
+        "repeated_entry_markets": repeated_entry_markets,
+        "repeated_entry_market_ratio": repeated_entry_market_ratio,
+        "single_time_markets": single_time_markets,
+        "single_time_market_ratio": single_time_market_ratio,
+    }
 
 
 def compute_features(conn, wallet: str, allow_closed_positions_refresh: bool) -> dict:
@@ -426,14 +456,15 @@ def compute_features(conn, wallet: str, allow_closed_positions_refresh: bool) ->
         sum(sorted_market_vols[:3]) / total_volume if total_volume > 0 and sorted_market_vols else 0.0
     )
 
+    timing_features = build_market_timing_features(trades)
+
     closed_positions = []
-    closed_positions_refreshed = False
     realized_pnl = None
     win_rate = None
     biggest_single_win = None
 
     try:
-        closed_positions, closed_positions_refreshed = get_closed_positions_cached(
+        closed_positions, _ = get_closed_positions_cached(
             conn,
             wallet,
             allow_refresh=allow_closed_positions_refresh,
@@ -475,7 +506,10 @@ def compute_features(conn, wallet: str, allow_closed_positions_refresh: bool) ->
         "avg_bet_size": avg_bet_size,
         "median_bet_size": median_bet_size,
         "biggest_single_win": biggest_single_win,
-        "closed_positions_refreshed": closed_positions_refreshed,
+        "repeated_entry_markets": timing_features["repeated_entry_markets"],
+        "repeated_entry_market_ratio": timing_features["repeated_entry_market_ratio"],
+        "single_time_markets": timing_features["single_time_markets"],
+        "single_time_market_ratio": timing_features["single_time_market_ratio"],
     }
 
 
@@ -486,11 +520,15 @@ def upsert_features(conn, features: dict):
             insert into user_features (
               wallet, updated_at, total_trades, total_volume, win_rate, realized_pnl,
               active_weeks, distinct_markets, top_market_volume_share, top3_market_volume_share,
-              avg_bet_size, median_bet_size, biggest_single_win
+              avg_bet_size, median_bet_size, biggest_single_win,
+              repeated_entry_markets, repeated_entry_market_ratio,
+              single_time_markets, single_time_market_ratio
             ) values (
               %(wallet)s, now(), %(total_trades)s, %(total_volume)s, %(win_rate)s, %(realized_pnl)s,
               %(active_weeks)s, %(distinct_markets)s, %(top_market_volume_share)s, %(top3_market_volume_share)s,
-              %(avg_bet_size)s, %(median_bet_size)s, %(biggest_single_win)s
+              %(avg_bet_size)s, %(median_bet_size)s, %(biggest_single_win)s,
+              %(repeated_entry_markets)s, %(repeated_entry_market_ratio)s,
+              %(single_time_markets)s, %(single_time_market_ratio)s
             )
             on conflict (wallet) do update set
               updated_at = now(),
@@ -504,7 +542,11 @@ def upsert_features(conn, features: dict):
               top3_market_volume_share = excluded.top3_market_volume_share,
               avg_bet_size = excluded.avg_bet_size,
               median_bet_size = excluded.median_bet_size,
-              biggest_single_win = excluded.biggest_single_win
+              biggest_single_win = excluded.biggest_single_win,
+              repeated_entry_markets = excluded.repeated_entry_markets,
+              repeated_entry_market_ratio = excluded.repeated_entry_market_ratio,
+              single_time_markets = excluded.single_time_markets,
+              single_time_market_ratio = excluded.single_time_market_ratio
             """,
             features,
         )
@@ -535,6 +577,10 @@ def tag_user(features: dict) -> List[Tuple[str, float, dict]]:
     median_bet_size = features["median_bet_size"] or 0.0
     realized_pnl = features["realized_pnl"] or 0.0
     distinct_markets = features["distinct_markets"] or 0
+    repeated_entry_markets = features["repeated_entry_markets"] or 0
+    repeated_entry_market_ratio = features["repeated_entry_market_ratio"] or 0.0
+    single_time_markets = features["single_time_markets"] or 0
+    single_time_market_ratio = features["single_time_market_ratio"] or 0.0
 
     if biggest_single_win >= 5000:
         tags.append(("big_single_win", min(1.0, biggest_single_win / 20000.0), {
@@ -574,6 +620,18 @@ def tag_user(features: dict) -> List[Tuple[str, float, dict]]:
             "realized_pnl": realized_pnl,
             "win_rate": win_rate,
             "active_weeks": active_weeks
+        }))
+
+    if repeated_entry_markets >= 2 and repeated_entry_market_ratio >= 0.40:
+        tags.append(("multi_time_event_scaler", min(1.0, repeated_entry_market_ratio), {
+            "repeated_entry_markets": repeated_entry_markets,
+            "repeated_entry_market_ratio": repeated_entry_market_ratio
+        }))
+
+    if single_time_markets >= 3 and single_time_market_ratio >= 0.70:
+        tags.append(("single_time_event_entry", min(1.0, single_time_market_ratio), {
+            "single_time_markets": single_time_markets,
+            "single_time_market_ratio": single_time_market_ratio
         }))
 
     return tags

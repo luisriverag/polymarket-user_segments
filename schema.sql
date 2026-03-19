@@ -35,6 +35,12 @@ create table if not exists user_features (
   biggest_single_win numeric
 );
 
+alter table user_features
+  add column if not exists repeated_entry_markets int,
+  add column if not exists repeated_entry_market_ratio numeric,
+  add column if not exists single_time_markets int,
+  add column if not exists single_time_market_ratio numeric;
+
 create table if not exists user_tags (
   wallet text not null,
   tag text not null,
@@ -71,6 +77,10 @@ select
   f.avg_bet_size,
   f.median_bet_size,
   f.biggest_single_win,
+  f.repeated_entry_markets,
+  f.repeated_entry_market_ratio,
+  f.single_time_markets,
+  f.single_time_market_ratio,
   coalesce(
     (
       select json_agg(

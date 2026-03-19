@@ -33,6 +33,10 @@
       <tr><th>Average bet size</th><td>{{ user.avg_bet_size|num }}</td></tr>
       <tr><th>Median bet size</th><td>{{ user.median_bet_size|num }}</td></tr>
       <tr><th>Biggest single win</th><td>{{ user.biggest_single_win|num }}</td></tr>
+      <tr><th>Repeated-entry markets</th><td>{{ user.repeated_entry_markets|intcomma }}</td></tr>
+      <tr><th>Repeated-entry market ratio</th><td>{{ user.repeated_entry_market_ratio|pct }}</td></tr>
+      <tr><th>Single-time markets</th><td>{{ user.single_time_markets|intcomma }}</td></tr>
+      <tr><th>Single-time market ratio</th><td>{{ user.single_time_market_ratio|pct }}</td></tr>
       <tr><th>Updated at</th><td>{{ user.updated_at }}</td></tr>
     </tbody>
   </table>
@@ -61,6 +65,8 @@
         <th>Market</th>
         <th>Volume</th>
         <th>Trades</th>
+        <th>First trade</th>
+        <th>Last trade</th>
       </tr>
     </thead>
     <tbody>
@@ -69,6 +75,8 @@
         <td>{{ m.title or m.slug or m.market_id }}</td>
         <td>{{ m.volume|num }}</td>
         <td>{{ m.trades|intcomma }}</td>
+        <td>{{ m.first_trade_at }}</td>
+        <td>{{ m.last_trade_at }}</td>
       </tr>
       {% endfor %}
     </tbody>

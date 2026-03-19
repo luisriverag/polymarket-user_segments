@@ -47,11 +47,41 @@
 </div>
 
 <div class="card">
+  <div class="toolbar">
+    <h2 style="margin:0;">2D segment view</h2>
+    <div class="muted">x = distinct markets · y = win rate · bubble size = total volume</div>
+  </div>
+
+  {% if bubble_points %}
+    <div style="height: 460px; margin-top: 16px;">
+      <canvas id="segmentBubbleChart"></canvas>
+    </div>
+  {% else %}
+    <div class="muted" style="margin-top: 10px;">No segment data for the current filters.</div>
+  {% endif %}
+</div>
+
+<div class="card">
   <form method="get">
     <div class="filter-grid">
       <div>
         <label>Wallet search</label><br>
         <input type="text" name="q" value="{{ q or '' }}" placeholder="0x..." style="width:100%;">
+      </div>
+
+      <div>
+        <label>Profile preset</label><br>
+        <select name="profile_preset" style="width:100%;">
+          <option value="" {% if not profile_preset %}selected{% endif %}>None</option>
+          <option value="specialist" {% if profile_preset == 'specialist' %}selected{% endif %}>specialist</option>
+          <option value="diversified" {% if profile_preset == 'diversified' %}selected{% endif %}>diversified</option>
+          <option value="whale" {% if profile_preset == 'whale' %}selected{% endif %}>whale</option>
+          <option value="consistent_active" {% if profile_preset == 'consistent_active' %}selected{% endif %}>consistent_active</option>
+          <option value="concentrated_sharp" {% if profile_preset == 'concentrated_sharp' %}selected{% endif %}>concentrated_sharp</option>
+          <option value="casual" {% if profile_preset == 'casual' %}selected{% endif %}>casual</option>
+          <option value="multi_time_scaler" {% if profile_preset == 'multi_time_scaler' %}selected{% endif %}>multi_time_scaler</option>
+          <option value="single_time_entry" {% if profile_preset == 'single_time_entry' %}selected{% endif %}>single_time_entry</option>
+        </select>
       </div>
 
       <div>
@@ -67,6 +97,71 @@
       <div>
         <label>Min trades</label><br>
         <input type="text" name="min_trades" value="{{ min_trades or '' }}" placeholder="10" style="width:100%;">
+      </div>
+
+      <div>
+        <label>Min active weeks</label><br>
+        <input type="text" name="min_active_weeks" value="{{ min_active_weeks or '' }}" placeholder="4" style="width:100%;">
+      </div>
+
+      <div>
+        <label>Max active weeks</label><br>
+        <input type="text" name="max_active_weeks" value="{{ max_active_weeks or '' }}" placeholder="12" style="width:100%;">
+      </div>
+
+      <div>
+        <label>Min distinct markets</label><br>
+        <input type="text" name="min_distinct_markets" value="{{ min_distinct_markets or '' }}" placeholder="5" style="width:100%;">
+      </div>
+
+      <div>
+        <label>Max distinct markets</label><br>
+        <input type="text" name="max_distinct_markets" value="{{ max_distinct_markets or '' }}" placeholder="20" style="width:100%;">
+      </div>
+
+      <div>
+        <label>Min top market share</label><br>
+        <input type="text" name="min_top_market_share" value="{{ min_top_market_share or '' }}" placeholder="0.6 or 60" style="width:100%;">
+      </div>
+
+      <div>
+        <label>Max top market share</label><br>
+        <input type="text" name="max_top_market_share" value="{{ max_top_market_share or '' }}" placeholder="0.8 or 80" style="width:100%;">
+      </div>
+
+      <div>
+        <label>Min top 3 market share</label><br>
+        <input type="text" name="min_top3_market_share" value="{{ min_top3_market_share or '' }}" placeholder="0.8 or 80" style="width:100%;">
+      </div>
+
+      <div>
+        <label>Max top 3 market share</label><br>
+        <input type="text" name="max_top3_market_share" value="{{ max_top3_market_share or '' }}" placeholder="0.95 or 95" style="width:100%;">
+      </div>
+
+      <div>
+        <label>Min avg bet size</label><br>
+        <input type="text" name="min_avg_bet_size" value="{{ min_avg_bet_size or '' }}" placeholder="100" style="width:100%;">
+      </div>
+
+      <div>
+        <label>Min median bet size</label><br>
+        <input type="text" name="min_median_bet_size" value="{{ min_median_bet_size or '' }}" placeholder="100" style="width:100%;">
+      </div>
+
+      <div>
+        <label>Min biggest single win</label><br>
+        <input type="text" name="min_biggest_single_win" value="{{ min_biggest_single_win or '' }}" placeholder="5000" style="width:100%;">
+      </div>
+
+      <div>
+        <label>Min repeated-entry ratio</label><br>
+        <input type="text" name="min_repeated_entry_ratio" value="{{ min_repeated_entry_ratio or '' }}" placeholder="0.4 or 40" style="width:100%;">
+      </div>
+
+      <div>
+        <label>Min single-time ratio</label><br>
+        <input type="text" name="min_single_time_ratio" value="{{ min_single_time_ratio or '' }}" placeholder="0.7 or 70" style="width:100%;">
       </div>
 
       <div>
@@ -87,12 +182,14 @@
           <option value="total_volume" {% if current_sort == 'total_volume' %}selected{% endif %}>total_volume</option>
           <option value="total_trades" {% if current_sort == 'total_trades' %}selected{% endif %}>total_trades</option>
           <option value="active_weeks" {% if current_sort == 'active_weeks' %}selected{% endif %}>active_weeks</option>
-          <option value="biggest_single_win" {% if current_sort == 'biggest_single_win' %}selected{% endif %}>biggest_single_win</option>
           <option value="distinct_markets" {% if current_sort == 'distinct_markets' %}selected{% endif %}>distinct_markets</option>
           <option value="top_market_volume_share" {% if current_sort == 'top_market_volume_share' %}selected{% endif %}>top_market_volume_share</option>
           <option value="top3_market_volume_share" {% if current_sort == 'top3_market_volume_share' %}selected{% endif %}>top3_market_volume_share</option>
           <option value="avg_bet_size" {% if current_sort == 'avg_bet_size' %}selected{% endif %}>avg_bet_size</option>
           <option value="median_bet_size" {% if current_sort == 'median_bet_size' %}selected{% endif %}>median_bet_size</option>
+          <option value="repeated_entry_market_ratio" {% if current_sort == 'repeated_entry_market_ratio' %}selected{% endif %}>repeated_entry_market_ratio</option>
+          <option value="single_time_market_ratio" {% if current_sort == 'single_time_market_ratio' %}selected{% endif %}>single_time_market_ratio</option>
+          <option value="biggest_single_win" {% if current_sort == 'biggest_single_win' %}selected{% endif %}>biggest_single_win</option>
           <option value="wallet" {% if current_sort == 'wallet' %}selected{% endif %}>wallet</option>
         </select>
       </div>
@@ -168,40 +265,18 @@
   </form>
 </div>
 
-{% if include_tags or exclude_tags %}
 <div class="card">
-  <div class="muted">Active tag filters</div>
-
-  {% if include_tags %}
+  <div class="muted">How to interpret segment filters</div>
   <div style="margin-top:10px;">
-    <strong>Include</strong>
-    <span class="muted">({{ tag_mode }})</span>
-    <div class="tag-chip-wrap" style="margin-top:8px;">
-      {% for t in include_tags %}
-        <span class="tag">{{ t }}</span>
-      {% endfor %}
-    </div>
+    <span class="tag">active_weeks = repeat participation</span>
+    <span class="tag">distinct_markets = breadth</span>
+    <span class="tag">top_market_share = specialization</span>
+    <span class="tag">top3_market_share = concentration</span>
+    <span class="tag">median_bet_size = typical conviction</span>
+    <span class="tag">repeated_entry_ratio = scales into same event over time</span>
+    <span class="tag">single_time_ratio = one-shot event entry style</span>
   </div>
-  {% endif %}
-
-  {% if exclude_tags %}
-  <div style="margin-top:14px;">
-    <strong>Exclude</strong>
-    <div class="tag-chip-wrap" style="margin-top:8px;">
-      {% for t in exclude_tags %}
-        <span class="tag tag-danger">{{ t }}</span>
-      {% endfor %}
-    </div>
-  </div>
-  {% endif %}
-
-  {% if min_tag_score %}
-  <div class="muted" style="margin-top:12px;">
-    Minimum included tag score: {{ min_tag_score }}
-  </div>
-  {% endif %}
 </div>
-{% endif %}
 
 <div class="card">
   <div class="toolbar">
@@ -221,7 +296,10 @@
         <th>Volume</th>
         <th>Trades</th>
         <th>Weeks</th>
-        <th>Top market share</th>
+        <th>Markets</th>
+        <th>Top market</th>
+        <th>Repeated-entry</th>
+        <th>Single-time</th>
       </tr>
     </thead>
     <tbody>
@@ -245,7 +323,10 @@
         <td>{{ u.total_volume|num }}</td>
         <td>{{ u.total_trades|intcomma }}</td>
         <td>{{ u.active_weeks|intcomma }}</td>
+        <td>{{ u.distinct_markets|intcomma }}</td>
         <td>{{ u.top_market_volume_share|pct }}</td>
+        <td>{{ u.repeated_entry_market_ratio|pct }}</td>
+        <td>{{ u.single_time_market_ratio|pct }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -323,6 +404,7 @@
 <script>
   const tagLabels = {{ chart_labels|tojson }};
   const tagValues = {{ chart_values|tojson }};
+  const bubblePoints = {{ bubble_points|tojson }};
 
   if (tagLabels.length > 0) {
     const ctx = document.getElementById("tagBreakdownChart");
@@ -340,15 +422,60 @@
         maintainAspectRatio: false,
         indexAxis: "y",
         plugins: {
-          legend: { display: false },
-          tooltip: { enabled: true }
+          legend: { display: false }
         },
         scales: {
           x: {
             beginAtZero: true,
-            ticks: {
-              precision: 0
+            ticks: { precision: 0 }
+          }
+        }
+      }
+    });
+  }
+
+  if (bubblePoints.length > 0) {
+    const bubbleCtx = document.getElementById("segmentBubbleChart");
+    new Chart(bubbleCtx, {
+      type: "bubble",
+      data: {
+        datasets: [{
+          label: "Wallet segments",
+          data: bubblePoints
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        parsing: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const p = context.raw;
+                return [
+                  `wallet: ${p.wallet}`,
+                  `distinct markets: ${p.x}`,
+                  `win rate: ${p.y.toFixed(1)}%`,
+                  `volume: ${p.volume.toFixed(2)}`,
+                  `realized pnl: ${p.realized_pnl.toFixed(2)}`,
+                  `active weeks: ${p.active_weeks}`
+                ];
+              }
             }
+          }
+        },
+        scales: {
+          x: {
+            title: { display: true, text: "Distinct markets" },
+            beginAtZero: true,
+            ticks: { precision: 0 }
+          },
+          y: {
+            title: { display: true, text: "Win rate %" },
+            beginAtZero: true,
+            suggestedMax: 100
           }
         }
       }
