@@ -154,6 +154,80 @@ def apply_profile_preset(where_parts, where_params, profile_preset: str):
         where_params.append(0.70)
 
 
+def metric_catalog():
+    return {
+        "distinct_markets": {
+            "sql": "coalesce(f.distinct_markets, 0)",
+            "label": "Distinct markets",
+            "kind": "count",
+        },
+        "win_rate_pct": {
+            "sql": "coalesce(f.win_rate, 0) * 100.0",
+            "label": "Win rate %",
+            "kind": "pct100",
+        },
+        "total_volume": {
+            "sql": "coalesce(f.total_volume, 0)",
+            "label": "Total volume",
+            "kind": "number",
+        },
+        "realized_pnl": {
+            "sql": "coalesce(f.realized_pnl, 0)",
+            "label": "Realized PnL",
+            "kind": "number",
+        },
+        "active_weeks": {
+            "sql": "coalesce(f.active_weeks, 0)",
+            "label": "Active weeks",
+            "kind": "count",
+        },
+        "total_trades": {
+            "sql": "coalesce(f.total_trades, 0)",
+            "label": "Total trades",
+            "kind": "count",
+        },
+        "top_market_volume_share_pct": {
+            "sql": "coalesce(f.top_market_volume_share, 0) * 100.0",
+            "label": "Top market share %",
+            "kind": "pct100",
+        },
+        "top3_market_volume_share_pct": {
+            "sql": "coalesce(f.top3_market_volume_share, 0) * 100.0",
+            "label": "Top 3 market share %",
+            "kind": "pct100",
+        },
+        "avg_bet_size": {
+            "sql": "coalesce(f.avg_bet_size, 0)",
+            "label": "Average bet size",
+            "kind": "number",
+        },
+        "median_bet_size": {
+            "sql": "coalesce(f.median_bet_size, 0)",
+            "label": "Median bet size",
+            "kind": "number",
+        },
+        "biggest_single_win": {
+            "sql": "coalesce(f.biggest_single_win, 0)",
+            "label": "Biggest single win",
+            "kind": "number",
+        },
+        "repeated_entry_market_ratio_pct": {
+            "sql": "coalesce(f.repeated_entry_market_ratio, 0) * 100.0",
+            "label": "Repeated-entry ratio %",
+            "kind": "pct100",
+        },
+        "single_time_market_ratio_pct": {
+            "sql": "coalesce(f.single_time_market_ratio, 0) * 100.0",
+            "label": "Single-time ratio %",
+            "kind": "pct100",
+        },
+    }
+
+
+def bubble_radius(value: float) -> float:
+    return max(4, min(22, 4 + math.log10(value + 1) * 3))
+
+
 @app.route("/")
 def index():
     sort = request.args.get("sort", "realized_pnl")
@@ -168,6 +242,18 @@ def index():
 
     tag_search = request.args.get("tag_search", "").strip().lower()
     profile_preset = request.args.get("profile_preset", "").strip().lower()
+
+    chart_metrics = metric_catalog()
+    chart_x = request.args.get("chart_x", "distinct_markets")
+    chart_y = request.args.get("chart_y", "win_rate_pct")
+    chart_size = request.args.get("chart_size", "total_volume")
+
+    if chart_x not in chart_metrics:
+        chart_x = "distinct_markets"
+    if chart_y not in chart_metrics:
+        chart_y = "win_rate_pct"
+    if chart_size not in chart_metrics:
+        chart_size = "total_volume"
 
     min_tag_score_raw, min_tag_score = parse_float_arg("min_tag_score")
     q = request.args.get("q", "").strip().lower()
@@ -511,18 +597,23 @@ def index():
             cur.execute(tag_breakdown_sql, base_params)
             tag_breakdown = cur.fetchall()
 
+            x_sql = chart_metrics[chart_x]["sql"]
+            y_sql = chart_metrics[chart_y]["sql"]
+            size_sql = chart_metrics[chart_size]["sql"]
+
             bubble_sql = f"""
                 select
                   f.wallet,
-                  coalesce(f.distinct_markets, 0) as x,
-                  coalesce(f.win_rate, 0) * 100.0 as y,
-                  coalesce(f.total_volume, 0) as volume,
+                  {x_sql} as x_value,
+                  {y_sql} as y_value,
+                  {size_sql} as size_value,
+                  coalesce(f.total_volume, 0) as total_volume,
                   coalesce(f.realized_pnl, 0) as realized_pnl,
                   coalesce(f.active_weeks, 0) as active_weeks
                 from user_features f
                 {join_sql}
                 where {where_sql}
-                order by coalesce(f.total_volume, 0) desc, f.wallet asc
+                order by {size_sql} desc, f.wallet asc
                 limit 250
             """
             cur.execute(bubble_sql, base_params)
@@ -537,14 +628,14 @@ def index():
 
         bubble_points = []
         for row in bubble_rows:
-            volume = float(row["volume"] or 0)
-            radius = max(4, min(22, 4 + math.log10(volume + 1) * 3))
+            size_value = float(row["size_value"] or 0)
             bubble_points.append({
-                "x": int(row["x"] or 0),
-                "y": float(row["y"] or 0),
-                "r": radius,
+                "x": float(row["x_value"] or 0),
+                "y": float(row["y_value"] or 0),
+                "r": bubble_radius(size_value),
                 "wallet": row["wallet"],
-                "volume": float(volume),
+                "size_value": size_value,
+                "total_volume": float(row["total_volume"] or 0),
                 "realized_pnl": float(row["realized_pnl"] or 0),
                 "active_weeks": int(row["active_weeks"] or 0),
             })
@@ -590,6 +681,13 @@ def index():
             chart_labels=chart_labels,
             chart_values=chart_values,
             bubble_points=bubble_points,
+            chart_metrics=chart_metrics,
+            chart_x=chart_x,
+            chart_y=chart_y,
+            chart_size=chart_size,
+            chart_x_label=chart_metrics[chart_x]["label"],
+            chart_y_label=chart_metrics[chart_y]["label"],
+            chart_size_label=chart_metrics[chart_size]["label"],
         )
     finally:
         conn.close()

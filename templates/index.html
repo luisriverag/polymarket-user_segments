@@ -49,7 +49,37 @@
 <div class="card">
   <div class="toolbar">
     <h2 style="margin:0;">2D segment view</h2>
-    <div class="muted">x = distinct markets · y = win rate · bubble size = total volume</div>
+    <div class="muted">{{ chart_x_label }} vs {{ chart_y_label }} · bubble size = {{ chart_size_label }}</div>
+  </div>
+
+  <div class="filter-grid" style="margin-top:16px; margin-bottom:8px;">
+    <div>
+      <label>X axis</label><br>
+      <select id="chart_x_select" style="width:100%;">
+        {% for key, meta in chart_metrics.items() %}
+          <option value="{{ key }}" {% if chart_x == key %}selected{% endif %}>{{ meta.label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Y axis</label><br>
+      <select id="chart_y_select" style="width:100%;">
+        {% for key, meta in chart_metrics.items() %}
+          <option value="{{ key }}" {% if chart_y == key %}selected{% endif %}>{{ meta.label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Bubble size</label><br>
+      <select id="chart_size_select" style="width:100%;">
+        {% for key, meta in chart_metrics.items() %}
+          <option value="{{ key }}" {% if chart_size == key %}selected{% endif %}>{{ meta.label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="display:flex; align-items:flex-end;">
+      <button type="button" id="chart_apply_btn">Update chart</button>
+    </div>
   </div>
 
   {% if bubble_points %}
@@ -211,6 +241,10 @@
           <option value="200" {% if per_page == 200 %}selected{% endif %}>200</option>
         </select>
       </div>
+
+      <input type="hidden" name="chart_x" value="{{ chart_x }}">
+      <input type="hidden" name="chart_y" value="{{ chart_y }}">
+      <input type="hidden" name="chart_size" value="{{ chart_size }}">
     </div>
 
     <div class="tag-mode-row">
@@ -226,12 +260,7 @@
         <div class="tag-chip-wrap">
           {% for t in available_tags %}
             <label class="tag choice-tag include-tag {% if t.tag in include_tags %}selected{% endif %}">
-              <input
-                type="checkbox"
-                name="tag"
-                value="{{ t.tag }}"
-                {% if t.tag in include_tags %}checked{% endif %}
-              >
+              <input type="checkbox" name="tag" value="{{ t.tag }}" {% if t.tag in include_tags %}checked{% endif %}>
               <span>{{ t.tag }}</span>
               <span class="tag-meta">{{ t.cnt }}</span>
             </label>
@@ -244,12 +273,7 @@
         <div class="tag-chip-wrap">
           {% for t in available_tags %}
             <label class="tag choice-tag exclude-tag {% if t.tag in exclude_tags %}selected{% endif %}">
-              <input
-                type="checkbox"
-                name="exclude_tag"
-                value="{{ t.tag }}"
-                {% if t.tag in exclude_tags %}checked{% endif %}
-              >
+              <input type="checkbox" name="exclude_tag" value="{{ t.tag }}" {% if t.tag in exclude_tags %}checked{% endif %}>
               <span>{{ t.tag }}</span>
               <span class="tag-meta">{{ t.cnt }}</span>
             </label>
@@ -405,6 +429,9 @@
   const tagLabels = {{ chart_labels|tojson }};
   const tagValues = {{ chart_values|tojson }};
   const bubblePoints = {{ bubble_points|tojson }};
+  const chartXLabel = {{ chart_x_label|tojson }};
+  const chartYLabel = {{ chart_y_label|tojson }};
+  const chartSizeLabel = {{ chart_size_label|tojson }};
 
   if (tagLabels.length > 0) {
     const ctx = document.getElementById("tagBreakdownChart");
@@ -421,15 +448,8 @@
         responsive: true,
         maintainAspectRatio: false,
         indexAxis: "y",
-        plugins: {
-          legend: { display: false }
-        },
-        scales: {
-          x: {
-            beginAtZero: true,
-            ticks: { precision: 0 }
-          }
-        }
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
       }
     });
   }
@@ -456,9 +476,10 @@
                 const p = context.raw;
                 return [
                   `wallet: ${p.wallet}`,
-                  `distinct markets: ${p.x}`,
-                  `win rate: ${p.y.toFixed(1)}%`,
-                  `volume: ${p.volume.toFixed(2)}`,
+                  `${chartXLabel}: ${p.x.toFixed(2)}`,
+                  `${chartYLabel}: ${p.y.toFixed(2)}`,
+                  `${chartSizeLabel}: ${p.size_value.toFixed(2)}`,
+                  `volume: ${p.total_volume.toFixed(2)}`,
                   `realized pnl: ${p.realized_pnl.toFixed(2)}`,
                   `active weeks: ${p.active_weeks}`
                 ];
@@ -468,19 +489,26 @@
         },
         scales: {
           x: {
-            title: { display: true, text: "Distinct markets" },
-            beginAtZero: true,
-            ticks: { precision: 0 }
+            title: { display: true, text: chartXLabel },
+            beginAtZero: true
           },
           y: {
-            title: { display: true, text: "Win rate %" },
-            beginAtZero: true,
-            suggestedMax: 100
+            title: { display: true, text: chartYLabel },
+            beginAtZero: true
           }
         }
       }
     });
   }
+
+  document.getElementById("chart_apply_btn")?.addEventListener("click", function () {
+    const url = new URL(window.location.href);
+    url.searchParams.set("chart_x", document.getElementById("chart_x_select").value);
+    url.searchParams.set("chart_y", document.getElementById("chart_y_select").value);
+    url.searchParams.set("chart_size", document.getElementById("chart_size_select").value);
+    url.searchParams.set("page", "1");
+    window.location.href = url.toString();
+  });
 </script>
 
 {% endblock %}
