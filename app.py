@@ -1,11 +1,10 @@
 import math
 import os
-from decimal import Decimal
-from urllib.parse import urlencode
 
 import psycopg2
 import psycopg2.extras
 from flask import Flask, abort, render_template, request
+from urllib.parse import urlencode
 
 PG_DSN = os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5432/postgres")
 
@@ -187,8 +186,7 @@ def index():
                     select wallet
                     from user_tags
                     group by wallet
-                    having
-                        array_agg(distinct tag order by tag) = %s
+                    having array_agg(distinct tag order by tag) = %s
                 ) include_tf on include_tf.wallet = f.wallet
                 """
             )
@@ -349,9 +347,26 @@ def index():
             cur.execute(filtered_stats_sql, base_params)
             filtered_stats = cur.fetchone()
 
+            tag_breakdown_sql = f"""
+                select
+                  ut.tag,
+                  count(distinct f.wallet) as wallet_count
+                from user_features f
+                {join_sql}
+                join user_tags ut on ut.wallet = f.wallet
+                where {where_sql}
+                group by ut.tag
+                order by wallet_count desc, ut.tag asc
+            """
+            cur.execute(tag_breakdown_sql, base_params)
+            tag_breakdown = cur.fetchall()
+
         total_pages = max(1, math.ceil(total_rows / per_page))
         has_prev = page > 1
         has_next = page < total_pages
+
+        chart_labels = [row["tag"] for row in tag_breakdown[:15]]
+        chart_values = [int(row["wallet_count"]) for row in tag_breakdown[:15]]
 
         return render_template(
             "index.html",
@@ -376,6 +391,9 @@ def index():
             total_pages=total_pages,
             has_prev=has_prev,
             has_next=has_next,
+            tag_breakdown=tag_breakdown,
+            chart_labels=chart_labels,
+            chart_values=chart_values,
         )
     finally:
         conn.close()

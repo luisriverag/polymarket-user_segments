@@ -1,6 +1,3 @@
-Here’s a stronger `README.md` focused on **user analysis and segmentation** for that repo.
-
-```markdown
 # Polymarket User Segments
 
 Analyze Polymarket wallets, classify user behavior, and explore segmented traders through a PostgreSQL-backed pipeline and Flask dashboard.

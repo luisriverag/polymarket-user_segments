@@ -18,7 +18,7 @@
   </div>
   <div class="card">
     <div class="muted">Total trades</div>
-    <div class="stat">{{ user.total_trades }}</div>
+    <div class="stat">{{ user.total_trades|intcomma }}</div>
   </div>
 </div>
 
@@ -26,14 +26,14 @@
   <h2>Feature summary</h2>
   <table>
     <tbody>
-      <tr><th>active_weeks</th><td>{{ user.active_weeks }}</td></tr>
-      <tr><th>distinct_markets</th><td>{{ user.distinct_markets }}</td></tr>
-      <tr><th>top_market_volume_share</th><td>{{ user.top_market_volume_share|pct }}</td></tr>
-      <tr><th>top3_market_volume_share</th><td>{{ user.top3_market_volume_share|pct }}</td></tr>
-      <tr><th>avg_bet_size</th><td>{{ user.avg_bet_size|num }}</td></tr>
-      <tr><th>median_bet_size</th><td>{{ user.median_bet_size|num }}</td></tr>
-      <tr><th>biggest_single_win</th><td>{{ user.biggest_single_win|num }}</td></tr>
-      <tr><th>updated_at</th><td>{{ user.updated_at }}</td></tr>
+      <tr><th>Active weeks</th><td>{{ user.active_weeks|intcomma }}</td></tr>
+      <tr><th>Distinct markets</th><td>{{ user.distinct_markets|intcomma }}</td></tr>
+      <tr><th>Top market volume share</th><td>{{ user.top_market_volume_share|pct }}</td></tr>
+      <tr><th>Top 3 market volume share</th><td>{{ user.top3_market_volume_share|pct }}</td></tr>
+      <tr><th>Average bet size</th><td>{{ user.avg_bet_size|num }}</td></tr>
+      <tr><th>Median bet size</th><td>{{ user.median_bet_size|num }}</td></tr>
+      <tr><th>Biggest single win</th><td>{{ user.biggest_single_win|num }}</td></tr>
+      <tr><th>Updated at</th><td>{{ user.updated_at }}</td></tr>
     </tbody>
   </table>
 </div>
@@ -66,9 +66,9 @@
     <tbody>
       {% for m in top_markets %}
       <tr>
-        <td>{{ m.title or m.market_id }}</td>
+        <td>{{ m.title or m.slug or m.market_id }}</td>
         <td>{{ m.volume|num }}</td>
-        <td>{{ m.trades }}</td>
+        <td>{{ m.trades|intcomma }}</td>
       </tr>
       {% endfor %}
     </tbody>

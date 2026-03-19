@@ -4,6 +4,11 @@
 <h1>Tag Leaderboard</h1>
 
 <div class="card">
+  <div class="toolbar">
+    <h2 style="margin:0;">All tags</h2>
+    <div class="muted">{{ rows|length|intcomma }} tags</div>
+  </div>
+
   <table>
     <thead>
       <tr>
@@ -11,15 +16,23 @@
         <th>User count</th>
         <th>Avg score</th>
         <th>Max score</th>
+        <th>Actions</th>
       </tr>
     </thead>
     <tbody>
       {% for r in rows %}
       <tr>
-        <td><a href="/?tag={{ r.tag }}">{{ r.tag }}</a></td>
-        <td>{{ r.user_count }}</td>
+        <td>
+          <span class="tag">{{ r.tag }}</span>
+        </td>
+        <td>{{ r.user_count|intcomma }}</td>
         <td>{{ r.avg_score|num }}</td>
         <td>{{ r.max_score|num }}</td>
+        <td>
+          <a href="/?tag={{ r.tag }}">Include</a>
+          <span class="muted"> · </span>
+          <a href="/?exclude_tag={{ r.tag }}">Exclude</a>
+        </td>
       </tr>
       {% endfor %}
     </tbody>
